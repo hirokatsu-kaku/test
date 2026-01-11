@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+   
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+   
+    <style>
+      body { background-color: #f4f6f9; color: #333; font-family: "Helvetica Neue", Arial, sans-serif; padding: 20px; }
+      
+      /* カンバンカラムのデザイン */
+      .kanban-col {
+        background-color: #e9ecef;
+        border-radius: 8px;
+        padding: 10px;
+        min-height: 500px;
+      }
+      .col-title { font-weight: bold; text-align: center; margin-bottom: 15px; padding: 5px; border-radius: 4px; color: white;}
+      .title-todo { background-color: #dc3545; } /* 赤：未対応 */
+      .title-doing { background-color: #fd7e14; } /* オレンジ：対応中 */
+      .title-done { background-color: #198754; }  /* 緑：解決済 */
+
+      /* カードのデザイン */
+      .card-custom {
+        border: none;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: transform 0.2s;
+        background: white;
+      }
+      .card-custom:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+      .card-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; background-color: #eee; color: #555; }
+      
+      .btn-add-float {
+        position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 30px;
+        font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 1000;
+      }
+    </style>
+  </head>
+  <body>
+
+    <h2 class="text-center fw-bold mb-4"><i class="bi bi-tools"></i> ヒヤリハット＆クレーム</h2>
+
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="kanban-col">
+          <div class="col-title title-todo">未対応 / 検証待ち</div>
+          <div id="list-todo"></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="kanban-col">
+          <div class="col-title title-doing">対応中 / 対策検討</div>
+          <div id="list-doing"></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="kanban-col">
+          <div class="col-title title-done">解決済</div>
+          <div id="list-done"></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-add-float" onclick="openRegisterModal()">
+      <i class="bi bi-plus"></i>
+    </button>
+
+    <div class="modal fade" id="dataModal" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title fw-bold" id="modalTitle">報告・改善提案</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form id="form">
+              <input type="hidden" id="rowNumber">
+              
+              <div class="row mb-3">
+                <div class="col-md-4">
+                  <label class="form-label small text-muted fw-bold">ステータス</label>
+                  <select class="form-select" id="status" onchange="toggleKaizenField()">
+                    <option value="未対応">未対応</option>
+                    <option value="対応中">対応中</option>
+                    <option value="解決済">解決済</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small text-muted fw-bold">発生日</label>
+                  <input type="date" class="form-control" id="date" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small text-muted fw-bold">種別</label>
+                  <select class="form-select" id="type">
+                    <option value="ヒヤリハット">ヒヤリハット (社内)</option>
+                    <option value="クレーム">クレーム (対外)</option>
+                    <option value="改善提案">改善提案 (ポジティブ)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label small text-muted fw-bold">件名</label>
+                <input type="text" class="form-control" id="title" placeholder="例：サーバー室のケーブルにつまずきそうになった" required>
+              </div>
+
+              <div class="p-3 bg-light rounded mb-3 border">
+                <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi bi-list-check"></i> 報告テンプレート</h6>
+                <div class="mb-2">
+                  <label class="form-label small fw-bold">① 事実 (Fact)</label>
+                  <textarea class="form-control" id="fact" rows="2" placeholder="起きたことを客観的に記述"></textarea>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small fw-bold">② 原因 (Cause)</label>
+                  <textarea class="form-control" id="cause" rows="2" placeholder="なぜ起きたのか？真因は？"></textarea>
+                </div>
+                <div class="mb-0">
+                  <label class="form-label small fw-bold">③ 対策 (Measure)</label>
+                  <textarea class="form-control" id="measure" rows="2" placeholder="再発防止策、暫定対応"></textarea>
+                </div>
+              </div>
+
+              <div id="kaizenArea" class="p-3 bg-success bg-opacity-10 rounded mb-3 border border-success" style="display:none;">
+                <h6 class="fw-bold text-success mb-2"><i class="bi bi-stars"></i> カイゼン効果 (Before / After)</h6>
+                <p class="small text-muted mb-1">この報告によって会社がどう良くなったかを記録しましょう。</p>
+                <textarea class="form-control" id="kaizen" rows="3" placeholder="例：配線をモールで固定し、清掃もしやすくなった。リスクゼロ化に成功。"></textarea>
+              </div>
+
+              <div class="mb-0 text-end">
+                <label class="small text-muted me-2">報告者:</label>
+                <input type="text" class="form-control d-inline-block" id="reporter" style="width: 150px;">
+              </div>
+
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-danger me-auto" id="deleteBtn" onclick="deleteData()" style="display:none;">削除</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveData()">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      let currentEditRow = null;
+
+      window.onload = function() { loadData(); };
+
+      
+      // ▼▼▼ 修正後 ▼▼▼
+      function loadData() {
+        const loadingHtml = '<div class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm"></span> Loading...</div>';
+        // 3つのカラム全てにローディングを表示
+        document.getElementById('list-todo').innerHTML = loadingHtml;
+        document.getElementById('list-doing').innerHTML = loadingHtml;
+        document.getElementById('list-done').innerHTML = loadingHtml;
+        
+        google.script.run.withSuccessHandler(render).getIncidentData();
+      }
+
+
+      
+     
+      function render(data) {
+        // コンテナをクリア
+        const containers = {
+          '未対応': document.getElementById('list-todo'),
+          '対応中': document.getElementById('list-doing'),
+          '解決済': document.getElementById('list-done')
+        };
+        Object.values(containers).forEach(el => el.innerHTML = "");
+
+        if(!data || data.length === 0) {
+          containers['未対応'].innerHTML = "<div class='text-center text-muted small'>データなし</div>";
+          return;
+        }
+       
+        data.forEach(item => {
+          const d = item.data;
+          // 配列定義: 0:発生日, 1:種別, 2:件名, 3:事実, 4:原因, 5:対策, 6:ステータス, 7:改善効果, 8:報告者
+          const status = d[6] || '未対応';
+          const targetContainer = containers[status] || containers['未対応'];
+
+          // カード生成
+          const card = document.createElement('div');
+          card.className = 'card card-custom p-3';
+          card.onclick = () => openEditModal(item);
+          
+          let badgeColor = d[1] === 'クレーム' ? 'bg-danger text-white' : 'bg-light text-dark border';
+          
+          card.innerHTML = `
+            <div class="d-flex justify-content-between mb-2">
+              <span class="badge ${badgeColor}">${d[1]}</span>
+              <small class="text-muted">${d[0].replace(/-/g, '/')}</small> </div>
+            <h6 class="fw-bold mb-2">${d[2]}</h6>
+            <div class="small text-muted text-truncate mb-2">${d[3]}</div> <div class="d-flex justify-content-between align-items-center">
+              <small class="fw-bold text-secondary"><i class="bi bi-person-circle"></i> ${d[8]}</small>
+            </div>
+          `;
+          targetContainer.appendChild(card);
+        });
+      }
+
+      // 新規登録
+      function openRegisterModal() {
+        currentEditRow = null;
+        document.getElementById('modalTitle').innerText = "報告作成";
+        document.getElementById('form').reset();
+        document.getElementById('rowNumber').value = "";
+        document.getElementById('status').value = "未対応";
+        document.getElementById('deleteBtn').style.display = 'none';
+        toggleKaizenField();
+        new bootstrap.Modal(document.getElementById('dataModal')).show();
+      }
+
+      // 編集
+      function openEditModal(item) {
+        currentEditRow = item.rowNumber;
+        const d = item.data;
+        
+        document.getElementById('modalTitle').innerText = "詳細・編集";
+        document.getElementById('rowNumber').value = item.rowNumber;
+        document.getElementById('date').value = d[0];
+        document.getElementById('type').value = d[1];
+        document.getElementById('title').value = d[2];
+        
+        document.getElementById('fact').value = d[3];
+        document.getElementById('cause').value = d[4];
+        document.getElementById('measure').value = d[5];
+        
+        document.getElementById('status').value = d[6] || '未対応';
+        document.getElementById('kaizen').value = d[7];
+        document.getElementById('reporter').value = d[8];
+
+        document.getElementById('deleteBtn').style.display = 'block';
+        toggleKaizenField();
+        new bootstrap.Modal(document.getElementById('dataModal')).show();
+      }
+
+      // 「解決済」の時だけカイゼン欄を表示
+      function toggleKaizenField() {
+        const status = document.getElementById('status').value;
+        const kaizenArea = document.getElementById('kaizenArea');
+        if (status === '解決済') {
+          kaizenArea.style.display = 'block';
+        } else {
+          kaizenArea.style.display = 'none';
+        }
+      }
+
+      function saveData() {
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = true; btn.innerText = "保存中...";
+
+        const data = {
+          rowNumber: document.getElementById('rowNumber').value,
+          date: document.getElementById('date').value,
+          type: document.getElementById('type').value,
+          title: document.getElementById('title').value,
+          fact: document.getElementById('fact').value,
+          cause: document.getElementById('cause').value,
+          measure: document.getElementById('measure').value,
+          status: document.getElementById('status').value,
+          kaizen: document.getElementById('kaizen').value,
+          reporter: document.getElementById('reporter').value
+        };
+
+        google.script.run.withSuccessHandler(() => {
+          bootstrap.Modal.getInstance(document.getElementById('dataModal')).hide();
+          loadData();
+          btn.disabled = false; btn.innerText = "保存";
+        }).saveIncident(data);
+      }
+
+      function deleteData() {
+        if(!currentEditRow) return;
+        if(confirm("本当に削除しますか？")) {
+          google.script.run.withSuccessHandler(() => {
+            bootstrap.Modal.getInstance(document.getElementById('dataModal')).hide();
+            loadData();
+          }).deleteIncident(currentEditRow);
+        }
+      }
+    </script>
+  </body>
+</html>

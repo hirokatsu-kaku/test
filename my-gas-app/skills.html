@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+  
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
+
+  <style>
+    body { background-color: #f4f6f9; font-family: "Helvetica Neue", Arial, sans-serif; padding-bottom: 60px; color: #333; }
+
+    /* ローディング */
+    #loading-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.9); z-index: 9999;
+      display: flex; justify-content: center; align-items: center; flex-direction: column;
+      transition: opacity 0.3s; pointer-events: none; opacity: 0;
+    }
+    .loading-active { opacity: 1 !important; pointer-events: auto !important; }
+
+    /* カード */
+    .member-card {
+      background: white; border: none; border-radius: 12px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      height: 100%; overflow: visible; position: relative;
+    }
+    .member-card:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+    
+    .card-top-bar { height: 6px; width: 100%; background: #ddd; border-radius: 12px 12px 0 0; }
+    .status-open .card-top-bar { background: #28a745; }
+    .status-busy .card-top-bar { background: #dc3545; }
+    .status-trip .card-top-bar { background: #ffc107; }
+
+    .profile-img {
+      width: 80px; height: 80px; object-fit: cover;
+      border-radius: 50%; border: 3px solid white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-top: -40px; background-color: #eee;
+    }
+    .profile-header { background-color: #e9ecef; height: 60px; border-radius: 12px 12px 0 0; }
+
+    /* ステータスドロップダウン */
+    .status-dropdown { position: absolute; top: 10px; right: 10px; z-index: 3; }
+    .status-btn { font-size: 0.85rem; padding: 4px 8px; font-weight: bold; color: white; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .bg-open { background-color: #28a745; }
+    .bg-busy { background-color: #dc3545; }
+    .bg-trip { background-color: #ffc107; color: #333; }
+
+    /* タグのスタイル */
+    .skill-badge { font-size: 0.85rem; margin-right: 4px; margin-bottom: 6px; display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; }
+    .badge-expert { background-color: #e7f1ff; color: #0d6efd; border: 1px solid #cff4fc; }
+    .badge-learning { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
+    
+    /* ★MBTIバッジのスタイル修正 */
+    .badge-mbti {
+      position: absolute; top: 10px; left: 10px;
+      padding: 6px 12px; /* 大きく */
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.85rem; /* フォントサイズUP */
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      color: white;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      z-index: 2;
+    }
+    /* ★色別クラス */
+    .mbti-purple { background-color: #8a2be2; background-image: linear-gradient(135deg, #8a2be2, #9932cc); }
+    .mbti-blue   { background-color: #0d6efd; background-image: linear-gradient(135deg, #0d6efd, #0a58ca); }
+    .mbti-green  { background-color: #198754; background-image: linear-gradient(135deg, #198754, #146c43); }
+    .mbti-yellow { background-color: #ffc107; background-image: linear-gradient(135deg, #ffc107, #ffca2c); color: #212529; text-shadow: none; }
+
+    /* Tagifyのカスタマイズ */
+    .tagify { --tags-border-color: #ced4da; border-radius: 0.25rem; }
+
+    .search-area { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 30px; }
+    .img-container { max-height: 400px; background-color: #f7f7f7; text-align: center; }
+    .img-container img { max-width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="loading-overlay">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div class="mt-2 fw-bold text-muted">処理中...</div>
+  </div>
+
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2 class="fw-bold m-0"><i class="bi bi-person-lines-fill text-primary"></i> Member & Skills</h2>
+      <button class="btn btn-primary fw-bold shadow-sm" onclick="openRegisterModal()">
+        <i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline">メンバー登録</span>
+      </button>
+    </div>
+
+    <div class="search-area">
+      <div class="row g-3 align-items-center">
+        <div class="col-md-4">
+          <input type="text" id="searchInput" class="form-control" placeholder="名前、役職、スキルで検索" onkeyup="filterCards()">
+        </div>
+        <div class="col-md-8">
+          <small class="text-muted fw-bold">注目のスキル:</small>
+          <div id="tagCloud" class="mt-2 d-flex flex-wrap gap-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4" id="cardContainer"></div>
+  </div>
+
+  <div class="modal fade" id="dataModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="modalTitle">プロフィール編集</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="form">
+            <input type="hidden" id="rowNumber">
+            
+            <div class="mb-4 text-center p-3 bg-light rounded">
+              <img id="previewImg" src="https://placehold.co/100x100/e9ecef/6c757d?text=User"
+                   class="rounded-circle shadow-sm mb-3" style="width:100px; height:100px; object-fit:cover;">
+              <br>
+              <input type="hidden" id="photoUrl">
+              <label class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-camera"></i> 画像を選択
+                <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageSelect(this)">
+              </label>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6"><label class="form-label fw-bold small text-muted">氏名 *</label><input type="text" class="form-control" id="name" required></div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-muted">役職</label>
+                <select class="form-select" id="dept"></select>
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6"><label class="form-label fw-bold small text-muted text-primary">得意スキル</label><input type="text" class="form-control" id="skills" placeholder="入力してEnter"></div>
+              <div class="col-md-6"><label class="form-label fw-bold small text-muted text-success">勉強中</label><input type="text" class="form-control" id="studying" placeholder="入力してEnter"></div>
+            </div>
+            
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <label class="form-label fw-bold small text-muted">MBTI</label>
+                <select class="form-select" id="mbti">
+                  <option value="">未設定</option>
+                  </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-bold small text-muted">ステータス</label>
+                <select class="form-select" id="status">
+                  <option value="募集中">募集中</option><option value="忙しい">忙しい</option><option value="出張中">出張中</option>
+                </select>
+              </div>
+              <div class="col-md-4"><label class="form-label fw-bold small text-muted">Slack ID</label><input type="text" class="form-control" id="slackId" placeholder="U0000000"></div>
+            </div>
+            <div class="mb-3"><label class="form-label fw-bold small text-muted">自己紹介</label><textarea class="form-control" id="comment" rows="2"></textarea></div>
+          </form>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-danger me-auto" onclick="deleteData()">削除</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+          <button type="button" class="btn btn-primary fw-bold" onclick="saveData()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="cropModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">画像のトリミング</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body p-0"><div class="img-container"><img id="cropImage" src=""></div></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+          <button type="button" class="btn btn-primary" onclick="cropAndSet()">決定</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ==========================================
+    // 設定エリア
+    // ==========================================
+    const ROLE_MASTER = ["CEO", "COO", "CSO", "インターン", "エンジニア", "サポート", "デザイナー", "マーケティング", "その他"];
+    
+    // ★MBTIマスターデータ（名前と色カテゴリー）
+    const MBTI_MASTER = {
+      "INTJ": { name: "建築家", color: "purple" },
+      "INTP": { name: "論理学者", color: "purple" },
+      "ENTJ": { name: "指揮官", color: "purple" },
+      "ENTP": { name: "討論者", color: "purple" },
+      "ISTJ": { name: "管理者", color: "blue" },
+      "ISFJ": { name: "擁護者", color: "blue" },
+      "ESTJ": { name: "幹部", color: "blue" },
+      "ESFJ": { name: "領事官", color: "blue" },
+      "INFJ": { name: "提唱者", color: "green" },
+      "INFP": { name: "仲介者", color: "green" },
+      "ENFJ": { name: "主人公", color: "green" },
+      "ENFP": { name: "運動家", color: "green" },
+      "ISTP": { name: "巨匠", color: "yellow" },
+      "ISFP": { name: "冒険家", color: "yellow" },
+      "ESTP": { name: "起業家", color: "yellow" },
+      "ESFP": { name: "エンターテイナー", color: "yellow" }
+    };
+    const MBTI_CODES = Object.keys(MBTI_MASTER);
+
+    let globalData = [];
+    let cropper; 
+    let tagifySkills, tagifyStudying;
+    const modalCrop = new bootstrap.Modal(document.getElementById('cropModal'));
+
+    window.onload = function() { initFormOptions(); loadData(); };
+
+    function initFormOptions() {
+      const deptSelect = document.getElementById('dept');
+      deptSelect.innerHTML = '<option value="">選択してください</option>';
+      ROLE_MASTER.forEach(r => { deptSelect.innerHTML += `<option value="${r}">${r}</option>`; });
+
+      // ★MBTIプルダウン生成（表示名を付与）
+      const mbtiSelect = document.getElementById('mbti');
+      MBTI_CODES.forEach(code => {
+        mbtiSelect.innerHTML += `<option value="${code}">${MBTI_MASTER[code].name} : ${code}</option>`;
+      });
+
+      const inputSkills = document.querySelector('#skills');
+      tagifySkills = new Tagify(inputSkills, { originalInputValueFormat: valuesArr => valuesArr.map(item => item.value).join(',') });
+      const inputStudying = document.querySelector('#studying');
+      tagifyStudying = new Tagify(inputStudying, { originalInputValueFormat: valuesArr => valuesArr.map(item => item.value).join(',') });
+    }
+
+    function showLoading() { document.getElementById('loading-overlay').classList.add('loading-active'); }
+    function hideLoading() { document.getElementById('loading-overlay').classList.remove('loading-active'); }
+    function loadData() { showLoading(); google.script.run.withSuccessHandler(renderCards).withFailureHandler(onFailure).getSkillData(); }
+
+    // ★ 表示処理
+    function renderCards(data) {
+      hideLoading();
+      globalData = data;
+      const container = document.getElementById('cardContainer');
+      const tagCloud = document.getElementById('tagCloud');
+      container.innerHTML = "";
+      tagCloud.innerHTML = "";
+
+      if (!data || data.length === 0) {
+        container.innerHTML = "<div class='col-12 text-center text-muted py-5'>データがありません</div>";
+        return;
+      }
+
+      // タグ集計
+      let skillSet = new Set();
+      data.forEach(item => {
+        const skills = (item.data[2] || "").split(',');
+        const study = (item.data[3] || "").split(',');
+        [...skills, ...study].forEach(s => { if(s.trim()) skillSet.add(s.trim()); });
+      });
+      skillSet.forEach(tag => {
+        tagCloud.innerHTML += `<span class="badge bg-white text-dark border shadow-sm p-2" style="cursor:pointer;" onclick="setSearch('${tag}')">${tag}</span>`;
+      });
+
+      // カード生成
+      data.forEach((item, index) => {
+        const d = item.data;
+        const name = d[0] || "No Name";
+        const dept = d[1] || "";
+        const skills = (d[2] || "").split(',').filter(s=>s.trim());
+        const study = (d[3] || "").split(',').filter(s=>s.trim());
+        const status = d[4] || "募集中";
+        const slackId = d[5] || "";
+        const imgUrl = d[6] || "https://placehold.co/100x100/e9ecef/6c757d?text=" + name.charAt(0);
+        const comment = d[7] || "";
+        const mbtiCode = d[8] || ""; // MBTIコード
+
+        let statusClass = "status-open"; let statusBadge = "bg-open";
+        if (status === "忙しい") { statusClass = "status-busy"; statusBadge = "bg-busy"; }
+        if (status === "出張中") { statusClass = "status-trip"; statusBadge = "bg-trip"; }
+
+        const skillsHtml = skills.map(s => `<span class="skill-badge badge-expert"></i>${s}</span>`).join('');
+        const studyHtml = study.map(s => `<span class="skill-badge badge-learning"></i>${s}</span>`).join('');
+        const slackBtn = slackId ? `<a href="https://slack.com/app_redirect?channel=${slackId}" target="_blank" class="btn btn-sm btn-outline-secondary w-100" onclick="event.stopPropagation()"><i class="bi bi-slack"></i> DM</a>` : '';
+
+        // ドロップダウン
+        const statusDropdown = `
+          <div class="status-dropdown dropdown">
+            <button class="status-btn btn dropdown-toggle ${statusBadge}" type="button" data-bs-toggle="dropdown" aria-expanded="false" onclick="event.stopPropagation()">${status}</button>
+            <ul class="dropdown-menu dropdown-menu-end shadow">
+              <li><button class="dropdown-item" onclick="changeStatus(event, ${item.rowNumber}, '募集中')">🟢 募集中</button></li>
+              <li><button class="dropdown-item" onclick="changeStatus(event, ${item.rowNumber}, '忙しい')">🔴 忙しい</button></li>
+              <li><button class="dropdown-item" onclick="changeStatus(event, ${item.rowNumber}, '出張中')">🟡 出張中</button></li>
+            </ul>
+          </div>`;
+
+        // ★MBTIバッジ生成（マスターデータから名前と色を取得）
+        let mbtiBadge = "";
+        if (mbtiCode && MBTI_MASTER[mbtiCode]) {
+          const mData = MBTI_MASTER[mbtiCode];
+          const colorClass = `mbti-${mData.color}`;
+          // 表示名: "建築家 : INTJ"
+          mbtiBadge = `<div class="badge-mbti ${colorClass}">${mData.name} : ${mbtiCode}</div>`;
+        }
+
+        // ★スキルセクションの生成（題名を追加）
+        let skillsSection = "";
+        if (skillsHtml) {
+          skillsSection = `<div class="mb-2"><small class="text-primary fw-bold d-block mb-1"></i> 得意スキル</small><div>${skillsHtml}</div></div>`;
+        }
+        let studySection = "";
+        if (studyHtml) {
+          studySection = `<div><small class="text-success fw-bold d-block mb-1"><i class="bi bi-seedling"></i> 勉強中</small><div>${studyHtml}</div></div>`;
+        }
+
+        // ★カード下部（text-startで左寄せにする）
+        const html = `
+          <div class="col-md-6 col-lg-4 card-item" data-search="${name} ${dept} ${d[2]} ${d[3]} ${mbtiCode}">
+            <div class="member-card shadow-sm ${statusClass}" onclick="openEditModal(${index})">
+              <div class="card-top-bar"></div>
+              ${mbtiBadge}
+              ${statusDropdown}
+              <div class="profile-header"></div>
+              <div class="text-center px-3">
+                <img src="${imgUrl}" class="profile-img" onerror="this.src='https://placehold.co/100x100/e9ecef/6c757d?text=?'">
+                <h5 class="fw-bold mt-2 mb-0">${name}</h5>
+                <p class="text-muted small mb-2 badge bg-light text-dark border">${dept}</p>
+                <div class="mb-2 small text-dark text-truncate">${comment}</div>
+                <div class="mb-3" style="max-width:120px; margin:0 auto;">${slackBtn}</div>
+              </div>
+              <div class="px-3 pb-3 border-top pt-3 text-start">
+                ${skillsSection}
+                ${studySection}
+              </div>
+            </div>
+          </div>
+        `;
+        container.innerHTML += html;
+      });
+    }
+
+    // (以降の changeStatus, openRegisterModal, openEditModal, handleImageSelect, cropAndSet, saveData, deleteData, filterCards, setSearch, onFailure は変更なし)
+    function changeStatus(event, rowNumber, newStatus) {
+      event.stopPropagation();
+      const btn = event.target.closest('.dropdown').querySelector('.status-btn');
+      btn.innerText = newStatus; btn.className = 'status-btn btn dropdown-toggle';
+      if(newStatus === '募集中') btn.classList.add('bg-open'); else if(newStatus === '忙しい') btn.classList.add('bg-busy'); else btn.classList.add('bg-trip');
+      showLoading(); google.script.run.withSuccessHandler(() => { loadData(); }).withFailureHandler(onFailure).updateSkillStatus(rowNumber, newStatus);
+    }
+    function openRegisterModal() {
+      document.getElementById('modalTitle').innerText = "メンバー登録"; document.getElementById('form').reset();
+      tagifySkills.removeAllTags(); tagifyStudying.removeAllTags();
+      document.getElementById('rowNumber').value = ""; document.getElementById('photoUrl').value = "";
+      document.getElementById('previewImg').src = "https://placehold.co/100x100/e9ecef/6c757d?text=New";
+      new bootstrap.Modal(document.getElementById('dataModal')).show();
+    }
+    function openEditModal(index) {
+      const item = globalData[index]; const d = item.data;
+      document.getElementById('modalTitle').innerText = "プロフィール編集"; document.getElementById('rowNumber').value = item.rowNumber;
+      document.getElementById('name').value = d[0] || ""; document.getElementById('dept').value = d[1] || "";
+      tagifySkills.removeAllTags(); tagifySkills.addTags((d[2] || "").split(','));
+      tagifyStudying.removeAllTags(); tagifyStudying.addTags((d[3] || "").split(','));
+      document.getElementById('status').value = d[4] || "募集中"; document.getElementById('slackId').value = d[5] || "";
+      const imgUrl = d[6] || ""; document.getElementById('photoUrl').value = imgUrl;
+      document.getElementById('previewImg').src = imgUrl || "https://placehold.co/100x100/e9ecef/6c757d?text=" + d[0].charAt(0);
+      document.getElementById('comment').value = d[7] || ""; document.getElementById('mbti').value = d[8] || "";
+      new bootstrap.Modal(document.getElementById('dataModal')).show();
+    }
+    function handleImageSelect(input) {
+      if (input.files && input.files[0]) { const reader = new FileReader(); reader.onload = function (e) { document.getElementById('cropImage').src = e.target.result; modalCrop.show(); const image = document.getElementById('cropImage'); if(cropper) cropper.destroy(); setTimeout(() => { cropper = new Cropper(image, { aspectRatio: 1, viewMode: 1, autoCropArea: 1 }); }, 200); }; reader.readAsDataURL(input.files[0]); } input.value = '';
+    }
+    function cropAndSet() {
+      if (!cropper) return; const canvas = cropper.getCroppedCanvas({ width: 150, height: 150 }); const base64 = canvas.toDataURL('image/jpeg', 0.7);
+      document.getElementById('previewImg').src = base64; document.getElementById('photoUrl').value = base64; modalCrop.hide();
+    }
+    function saveData() {
+      const name = document.getElementById('name').value; if (!name) { alert("氏名は必須です"); return; } showLoading();
+      const data = { rowNumber: document.getElementById('rowNumber').value, name: name, dept: document.getElementById('dept').value, skills: document.getElementById('skills').value, studying: document.getElementById('studying').value, status: document.getElementById('status').value, slackId: document.getElementById('slackId').value, photoUrl: document.getElementById('photoUrl').value, comment: document.getElementById('comment').value, mbti: document.getElementById('mbti').value };
+      google.script.run.withFailureHandler(onFailure).withSuccessHandler(() => { bootstrap.Modal.getInstance(document.getElementById('dataModal')).hide(); loadData(); }).saveSkill(data);
+    }
+    function deleteData() {
+      const row = document.getElementById('rowNumber').value; if (!row) return; if (confirm("削除しますか？")) { showLoading(); google.script.run.withSuccessHandler(() => { bootstrap.Modal.getInstance(document.getElementById('dataModal')).hide(); loadData(); }).deleteSkill(row); }
+    }
+    function filterCards() {
+      const val = document.getElementById('searchInput').value.toLowerCase(); const cards = document.getElementsByClassName('card-item');
+      Array.from(cards).forEach(card => { const text = card.getAttribute('data-search').toLowerCase(); card.style.display = text.includes(val) ? "block" : "none"; });
+    }
+    function setSearch(tag) { document.getElementById('searchInput').value = tag; filterCards(); }
+    function onFailure(e) { hideLoading(); alert("エラー: " + e.message); }
+  </script>
+</body>
+</html>

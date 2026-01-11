@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    
+    <style>
+      /* ▼▼▼ デザイン設定 ▼▼▼ */
+      body {
+        background-color: #ffffff;
+        color: #333333;
+        font-family: "Helvetica Neue", Arial, sans-serif;
+        padding: 20px;
+      }
+
+      /* テーブルの見た目 */
+      .custom-table thead th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        padding: 12px;
+        font-weight: bold;
+        color: #495057;
+      }
+      .custom-table tbody td {
+        padding: 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid #dee2e6;
+      }
+
+      /* ボタンの色設定 */
+      .btn-success-custom {
+        background-color: #5cb85c;
+        border-color: #4cae4c;
+        color: white;
+        font-weight: bold;
+      }
+      .btn-success-custom:hover { background-color: #449d44; color: white; }
+      
+      .btn-delete { background-color: #d9534f; color: white; border: none; padding: 5px 10px; font-size: 0.9rem; border-radius: 4px; }
+      .btn-delete:hover { background-color: #c9302c; color: white; }
+
+      .btn-edit { background-color: #f0ad4e; color: white; border: none; padding: 5px 10px; font-size: 0.9rem; border-radius: 4px; margin-right: 5px;}
+      .btn-edit:hover { background-color: #ec971f; color: white; }
+    </style>
+  </head>
+  <body>
+
+    <h2 class="text-center fw-bold mb-4">PC機材貸し出し管理</h2>
+
+    <div class="table-responsive">
+      <table class="table custom-table">
+        <thead>
+          <tr>
+            <th style="width: 25%;">機材名</th>
+            <th style="width: 20%;">所持者</th>
+            <th style="width: 20%;">貸出日</th>
+            <th style="width: 20%;">備考</th>
+            <th style="width: 15%;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="pcTableBody">
+          <tr><td colspan="5" class="text-center py-5 text-muted">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-3">
+      <button class="btn btn-success-custom" onclick="openRegisterModal()">
+        <i class="bi bi-plus-lg"></i> 追加
+      </button>
+    </div>
+
+    <div class="modal fade" id="dataModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title fw-bold" id="modalTitle">新規登録</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <form id="pcForm">
+              <input type="hidden" name="rowNumber" id="rowNumber">
+              
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted">機材名</label>
+                <input type="text" class="form-control" name="pcName" id="inputName" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted">所持者</label>
+                <input type="text" class="form-control" name="holder" id="inputHolder" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted">貸出日</label>
+                <input type="date" class="form-control" name="date" id="inputDate" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold small text-muted">備考</label>
+                <input type="text" class="form-control" name="note" id="inputNote">
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+            <button type="button" class="btn btn-success-custom" id="saveBtn" onclick="saveData()">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      let isEditMode = false; // 現在が「編集モード」かどうかのフラグ
+
+      // 画面読み込み時にデータを取得開始
+      window.onload = function() {
+        loadPcData();
+      };
+
+      // =======================================================
+      // ▼▼▼ データ取得・表示処理 ▼▼▼
+      // =======================================================
+      function loadPcData() {
+        google.script.run
+          .withFailureHandler(onFailure) // エラー時の処理
+          .withSuccessHandler(showPcData) // 成功時の処理
+          .getPcData();
+      }
+
+      function showPcData(data) {
+        const tableBody = document.getElementById('pcTableBody');
+        tableBody.innerHTML = "";
+        
+        if (!data || data.length === 0) {
+          tableBody.innerHTML = "<tr><td colspan='5' class='text-center py-4 text-muted'>データがありません</td></tr>";
+          return;
+        }
+
+        data.forEach(function(item) {
+          const html = `
+            <tr>
+              <td>${item.name}</td>
+              <td>${item.holder}</td>
+              <td>${item.date ? item.date.replace(/-/g, '/') : '-'}</td>
+              <td class="text-muted small">${item.note}</td>
+              <td>
+                <button class="btn btn-edit" onclick="openEditModal(${item.rowNumber}, '${item.name}', '${item.holder}', '${item.date}', '${item.note}')">編集</button>
+                <button class="btn btn-delete" onclick="deleteData(${item.rowNumber})">削除</button>
+              </td>
+            </tr>`;
+          tableBody.innerHTML += html;
+        });
+      }
+
+      // =======================================================
+      // ▼▼▼ モーダル制御処理 (開く処理) ▼▼▼
+      // =======================================================
+      
+      // 新規登録モードで開く
+      function openRegisterModal() {
+        isEditMode = false;
+        document.getElementById('modalTitle').innerText = "新規貸出登録";
+        document.getElementById('pcForm').reset();
+        document.getElementById('rowNumber').value = ""; 
+        
+        new bootstrap.Modal(document.getElementById('dataModal')).show();
+      }
+
+      // 編集モードで開く
+      function openEditModal(row, name, holder, date, note) {
+        isEditMode = true;
+        document.getElementById('modalTitle').innerText = "内容の編集";
+        
+        // 既存データをフォームに入れる
+        document.getElementById('rowNumber').value = row;
+        document.getElementById('inputName').value = name;
+        document.getElementById('inputHolder').value = holder;
+        document.getElementById('inputDate').value = date;
+        document.getElementById('inputNote').value = note;
+
+        new bootstrap.Modal(document.getElementById('dataModal')).show();
+      }
+
+      // =======================================================
+      // ▼▼▼ 保存処理 (登録・編集) ▼▼▼
+      // =======================================================
+      function saveData() {
+        // バリデーション (入力チェック)
+        const pcName = document.getElementById('inputName').value;
+        const holder = document.getElementById('inputHolder').value;
+        const date = document.getElementById('inputDate').value;
+        
+        if (!pcName || !holder || !date) {
+          alert("「機材名」「所持者」「貸出日」は必須項目です");
+          return;
+        }
+
+        // ボタンを無効化して連打防止
+        const btn = document.getElementById('saveBtn');
+        const originalText = btn.innerText;
+        btn.disabled = true;
+        btn.innerText = "保存中...";
+
+        // 送信データの作成
+        const data = {
+          rowNumber: document.getElementById('rowNumber').value,
+          pcName: pcName,
+          holder: holder,
+          date: date,
+          note: document.getElementById('inputNote').value
+        };
+
+        // GASへの送信処理
+        const runner = google.script.run
+          .withFailureHandler(function(error) {
+            // ★エラーが発生した場合
+            alert("エラーが発生しました: " + error.message);
+            btn.disabled = false;
+            btn.innerText = originalText;
+          })
+          .withSuccessHandler(function(response) {
+            // ★成功した場合
+            if (response.startsWith("ERROR")) {
+              alert("システムエラー: " + response);
+            } else {
+              // モーダルを閉じてリスト更新
+              const modalEl = document.getElementById('dataModal');
+              bootstrap.Modal.getInstance(modalEl).hide();
+              document.getElementById('pcForm').reset();
+              loadPcData(); 
+            }
+            // ボタンを元に戻す
+            btn.disabled = false;
+            btn.innerText = originalText;
+          });
+
+        // モードによって呼ぶ関数を変える
+        if (isEditMode) {
+          runner.editPc(data);
+        } else {
+          runner.registerPc(data);
+        }
+      }
+
+      // =======================================================
+      // ▼▼▼ 削除処理 ▼▼▼
+      // =======================================================
+      function deleteData(rowNumber) {
+        if(!confirm("本当に削除しますか？")) return;
+
+        google.script.run
+          .withFailureHandler(onFailure)
+          .withSuccessHandler(function() {
+            loadPcData();
+          })
+          .deletePc(rowNumber);
+      }
+
+      // 共通エラーハンドラ
+      function onFailure(error) {
+        alert("予期せぬエラーが発生しました。\n" + error.message);
+      }
+    </script>
+  </body>
+</html>
