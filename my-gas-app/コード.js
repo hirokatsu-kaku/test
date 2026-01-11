@@ -1,43 +1,46 @@
 // ==============================================================================
-// ▼▼▼ 1. 共通設定・ルーティング (ページ切り替え) ▼▼▼
+// ▼▼▼ 1. 共通設定・ルーティング (SPA対応) ▼▼▼
 // ==============================================================================
 
 function doGet(e) {
-  // URLパラメータ ?page=xxx を取得。なければ 'pc' をデフォルトにする
-  let page = e.parameter.page || 'pc';
-  let template;
-  let title = '会社ポータル';
- 
-  // ページごとのHTMLファイル指定
-  switch(page) {
-    case 'skills':
-      template = HtmlService.createTemplateFromFile('skills');
-      title = 'Member & Skills (タレント名鑑)';
-      break;
-    case 'books':
-      template = HtmlService.createTemplateFromFile('books');
-      title = '社内図書管理';
-      break;
-    case 'incident':
-      template = HtmlService.createTemplateFromFile('incident');
-      title = 'クレーム＆ヒヤリハット';
-      break;
-    case 'events':
-      template = HtmlService.createTemplateFromFile('events');
-      title = 'イベント開催履歴';
-      break;
-    case 'pc':
-    default:
-      template = HtmlService.createTemplateFromFile('index'); // PC管理 (index.html)
-      title = 'PC機材貸し出し管理';
-      break;
-  }
- 
+  // メインのSPAフレームを返す
+  const template = HtmlService.createTemplateFromFile('main');
   return template.evaluate()
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL) // Googleサイト埋め込み許可
-    .setTitle(title);
- }
+    .setTitle('会社ポータル');
+}
+
+// ページコンテンツを取得する関数（JavaScript側から呼ばれる）
+function getPageContent(pageName) {
+  try {
+    // HTMLファイル全体を取得
+    const htmlOutput = HtmlService.createTemplateFromFile(pageName).evaluate();
+    let fullHtml = htmlOutput.getContent();
+    
+    // <style>タグを抽出
+    const styleMatches = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+    let styles = '';
+    if (styleMatches) {
+      styles = styleMatches.join('\n');
+    }
+    
+    // <body>タグ内のコンテンツを抽出
+    const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    let bodyContent = '';
+    if (bodyMatch && bodyMatch[1]) {
+      bodyContent = bodyMatch[1];
+    } else {
+      bodyContent = fullHtml;
+    }
+    
+    // CSSとbodyコンテンツを結合して返す
+    return styles + bodyContent;
+  } catch (e) {
+    Logger.log('Error in getPageContent: ' + e.toString());
+    return '<div class="alert alert-danger m-4">ページの読み込みに失敗しました: ' + e.message + '</div>';
+  }
+}
  
  
  // ==============================================================================
@@ -527,27 +530,241 @@ function doGet(e) {
  
  function deleteIncident(row) { return deleteDataCommon('ヒヤリハット', row); }
  
- // ---------------------------
- // E. イベント履歴
- // ---------------------------
- function getEventData() { return getDataCommon('イベント履歴'); }
+// ---------------------------
+// E. イベント履歴
+// ---------------------------
+function getEventData() { 
+  const rawData = getDataCommon('イベント履歴');
+  
+  // 各イベントのアルバムURLから動的にサムネイルを取得
+  const enrichedData = rawData.map(item => {
+    const d = item.data;
+    const albumUrl = d[4]; // アルバムURL
+    
+    // アルバムURLが存在し、サムネイルURLが空または古い場合は再取得
+    if (albumUrl && albumUrl.includes('photos.')) {
+      try {
+        const freshThumb = extractThumbnailFromGooglePhotos(albumUrl);
+        if (freshThumb) {
+          // データ配列のサムネイルURL部分を更新
+          d[5] = freshThumb;
+        }
+      } catch(e) {
+        Logger.log("サムネイル動的取得エラー（イベント: " + d[1] + "）: " + e.message);
+        // エラー時は既存のサムネイルをそのまま使用
+      }
+    }
+    
+    return item;
+  });
+  
+  return enrichedData;
+}
  
- function saveEvent(data) {
-   // 画像がない場合のデフォルト処理などはHTML側あるいは運用でカバー
-   return saveDataCommon('イベント履歴', {
-     rowNumber: data.rowNumber,
-     values: [
-       data.date,       // 開催日
-       data.name,       // イベント名
-       data.location,   // 場所
-       data.count,      // 参加人数
-       data.albumUrl,   // Googleフォトなどのアルバムリンク
-       data.thumbUrl,   // ★追加: フィード表示用の表紙画像URL
-       data.docUrl,     // ★追加: Notionなどの資料URL
-       data.members,     // ★追加: 参加メンバー（カンマ区切りテキスト）
-     ]
-   });
- }
+function saveEvent(data) {
+  // GoogleフォトアルバムURLから最初の画像URLを自動取得
+  let thumbUrl = "";
+  
+  // 編集時は既存のサムネイルを保持
+  if (data.rowNumber) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('イベント履歴');
+    const existingThumb = sheet.getRange(Number(data.rowNumber), 6).getValue();
+    thumbUrl = existingThumb || "";
+  }
+  
+  // アルバムURLがある場合は新しいサムネイルを取得を試みる
+  if (data.albumUrl && data.albumUrl.includes('photos.')) {
+    try {
+      const newThumb = extractThumbnailFromGooglePhotos(data.albumUrl);
+      if (newThumb) {
+        thumbUrl = newThumb; // 取得成功時のみ上書き
+      }
+    } catch(e) {
+      Logger.log("サムネイル自動取得エラー: " + e.message);
+      // エラー時は既存のthumbUrlをそのまま使用
+    }
+  }
+  
+  // 画像がない場合のデフォルト処理などはHTML側あるいは運用でカバー
+  return saveDataCommon('イベント履歴', {
+    rowNumber: data.rowNumber,
+    values: [
+      data.date,       // 開催日
+      data.name,       // イベント名
+      data.location,   // 場所
+      data.count,      // 参加人数
+      data.albumUrl,   // Googleフォトなどのアルバムリンク
+      thumbUrl,        // ★修正: 自動取得したサムネイルURL
+      data.docUrl,     // ★追加: Notionなどの資料URL
+      data.members,    // ★追加: 参加メンバー（カンマ区切りテキスト）
+    ]
+  });
+}
+
+// GoogleフォトアルバムURLから最初の画像を取得する補助関数（改善版v2）
+function extractThumbnailFromGooglePhotos(albumUrl) {
+  try {
+    Logger.log("サムネイル取得: " + albumUrl);
+    
+    // キャッシュバスティング
+    const cacheBustUrl = albumUrl + (albumUrl.includes('?') ? '&' : '?') + '_t=' + new Date().getTime();
+    
+    const response = UrlFetchApp.fetch(cacheBustUrl, {
+      muteHttpExceptions: true,
+      followRedirects: true,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      }
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      Logger.log("HTTPエラー（サムネイル取得）: " + response.getResponseCode());
+      return "";
+    }
+    
+    const html = response.getContentText();
+    
+    // 1. og:imageメタタグを探す（最も確実）
+    const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+    if (ogImageMatch && ogImageMatch[1] && ogImageMatch[1].includes('lh3.googleusercontent.com')) {
+      let thumbUrl = ogImageMatch[1];
+      // パラメータをクリーンアップして適切なサイズに設定
+      thumbUrl = thumbUrl.split('=')[0] + '=w600-h600-no';
+      Logger.log("サムネイル取得成功（og:image）: " + thumbUrl);
+      return thumbUrl;
+    }
+    
+    // 2. 代替: HTML全体から最初のlh3.googleusercontent.comのURLを探す
+    const imgMatch = html.match(/https:\/\/lh3\.googleusercontent\.com\/([a-zA-Z0-9_\-]+)/);
+    if (imgMatch) {
+      const baseUrl = 'https://lh3.googleusercontent.com/' + imgMatch[1];
+      const thumbUrl = baseUrl + '=w600-h600-no';
+      Logger.log("サムネイル取得成功（正規表現）: " + thumbUrl);
+      return thumbUrl;
+    }
+    
+    Logger.log("サムネイル取得失敗: URLが見つかりませんでした");
+    return "";
+    
+  } catch(e) {
+    Logger.log("サムネイル取得エラー: " + e.message);
+    return "";
+  }
+}
+
+// GoogleフォトアルバムURLから全ての画像URLを取得する関数（改善版v2）
+function getAllPhotosFromAlbum(albumUrl) {
+  try {
+    Logger.log("=== アルバム画像取得開始 ===");
+    Logger.log("アルバムURL: " + albumUrl);
+    
+    // キャッシュバスティング用のタイムスタンプを追加
+    const cacheBustUrl = albumUrl + (albumUrl.includes('?') ? '&' : '?') + '_t=' + new Date().getTime();
+    
+    const response = UrlFetchApp.fetch(cacheBustUrl, {
+      muteHttpExceptions: true,
+      followRedirects: true,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    
+    if (response.getResponseCode() !== 200) {
+      Logger.log("HTTPエラー: " + response.getResponseCode());
+      return [];
+    }
+    
+    const html = response.getContentText();
+    Logger.log("HTML取得成功（長さ: " + html.length + "）");
+    
+    // ===== 画像URL抽出戦略（複数の方法を試す） =====
+    
+    // 1. og:imageメタタグから取得（最も確実）
+    const ogImages = [];
+    const ogRegex = /<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/gi;
+    let match;
+    while ((match = ogRegex.exec(html)) !== null) {
+      if (match[1] && match[1].includes('lh3.googleusercontent.com')) {
+        ogImages.push(match[1]);
+      }
+    }
+    Logger.log("og:imageから取得: " + ogImages.length + "件");
+    
+    // 2. スクリプト内やHTMLソース全体からlh3.googleusercontent.comのURLを抽出
+    // より緩い正規表現で、画像IDが含まれる全てのURLを取得
+    const allUrls = [];
+    const urlRegex = /https:\/\/lh3\.googleusercontent\.com\/([a-zA-Z0-9_\-]+)/g;
+    while ((match = urlRegex.exec(html)) !== null) {
+      allUrls.push('https://lh3.googleusercontent.com/' + match[1]);
+    }
+    Logger.log("HTML全体から抽出: " + allUrls.length + "件");
+    
+    // 3. 全URLを統合して重複除去
+    const combinedUrls = [...new Set([...ogImages, ...allUrls])];
+    Logger.log("統合後（重複除去）: " + combinedUrls.length + "件");
+    
+    if (combinedUrls.length === 0) {
+      Logger.log("警告: 画像URLが見つかりませんでした");
+      return [];
+    }
+    
+    // 4. フィルタリング（緩和版）
+    const filteredUrls = combinedUrls.filter(url => {
+      const baseUrl = url.split('=')[0]; // パラメータを除去したベースURL
+      const idPart = baseUrl.split('/').pop(); // 最後の部分（画像ID）
+      
+      // 緩和された条件：
+      // - 極端に短いID（10文字未満）のみ除外
+      // - それ以外は全て許可
+      if (idPart.length < 10) {
+        Logger.log("除外（IDが短すぎる）: " + url);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    Logger.log("フィルタリング後: " + filteredUrls.length + "件");
+    
+    // 5. URL重複がある場合は最初の出現のみを保持
+    const uniqueFilteredUrls = [];
+    const seenIds = new Set();
+    
+    filteredUrls.forEach(url => {
+      const baseUrl = url.split('=')[0];
+      const idPart = baseUrl.split('/').pop();
+      
+      if (!seenIds.has(idPart)) {
+        seenIds.add(idPart);
+        uniqueFilteredUrls.push(url);
+      }
+    });
+    
+    Logger.log("ID重複除去後: " + uniqueFilteredUrls.length + "件");
+    
+    // 6. 高解像度URLに変換
+    const finalUrls = uniqueFilteredUrls.map(url => {
+      // 既存のパラメータを全て削除
+      const baseUrl = url.split('=')[0];
+      // 高解像度パラメータを追加（最大1600px、アスペクト比維持）
+      return baseUrl + '=w1600-h1600-no';
+    });
+    
+    Logger.log("=== 最終画像URLリスト（" + finalUrls.length + "件）===");
+    finalUrls.forEach((url, index) => {
+      Logger.log((index + 1) + ": " + url.substring(0, 80) + "...");
+    });
+    
+    return finalUrls;
+    
+  } catch(e) {
+    Logger.log("=== エラー発生 ===");
+    Logger.log("エラーメッセージ: " + e.message);
+    Logger.log("スタックトレース: " + e.stack);
+    return [];
+  }
+}
  
  function deleteEvent(row) { return deleteDataCommon('イベント履歴', row); }
  

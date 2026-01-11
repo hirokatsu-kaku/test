@@ -81,12 +81,18 @@
         align-items: center;
         justify-content: center;
         border-right: 1px solid #eee;
+        cursor: pointer; /* クリック可能を示す */
       }
       .card-img-left-wrapper img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain; /* ▼重要: 全体が表示されるように収める */
-        padding: 4px; /* 少し余白を入れる */
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain !important; /* ▼重要: 全体が表示されるように収める */
+        display: block;
+      }
+      .card-img-left-wrapper:hover {
+        background-color: #e9ecef;
       }
 
       /* 右側の本文エリア */
@@ -179,12 +185,91 @@
         flex-direction: column;
         color: #6c757d;
       }
+
+      /* フォトビューアーモーダル */
+      .photo-viewer-modal .modal-dialog {
+        max-width: 90vw;
+        max-height: 90vh;
+        margin: 1.75rem auto;
+      }
+      .photo-viewer-modal .modal-content {
+        background-color: #000;
+        border: none;
+        height: 90vh;
+      }
+      .photo-viewer-modal .modal-header {
+        background-color: rgba(0,0,0,0.9);
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        color: white;
+      }
+      .photo-viewer-modal .modal-body {
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #000;
+        position: relative;
+        overflow: hidden;
+        min-height: 60vh;
+      }
+      .photo-viewer-modal .modal-body img {
+        max-width: 90%;
+        max-height: 70vh;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+        object-position: center !important;
+        display: block;
+        margin: auto;
+      }
+      .photo-nav-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(255,255,255,0.2);
+        border: none;
+        color: white;
+        font-size: 2rem;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.3s;
+        z-index: 10;
+      }
+      .photo-nav-btn:hover {
+        background: rgba(255,255,255,0.4);
+      }
+      .photo-nav-btn.prev {
+        left: 20px;
+      }
+      .photo-nav-btn.next {
+        right: 20px;
+      }
+      .photo-counter {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+      }
+      .photo-loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+      }
     </style>
   </head>
   <body>
 
     <h2 class="text-center fw-bold mb-5">
-      <i class="bi bi-clock-history text-primary"></i> Company History
+      <i class="bi bi-clock-history text-primary"></i> イベント履歴
       <div class="fs-6 text-muted fw-normal mt-1">会社イベントとカルチャーの軌跡</div>
     </h2>
 
@@ -198,6 +283,31 @@
     <button class="btn btn-primary fab-btn" onclick="openRegisterModal()">
       <i class="bi bi-plus-lg"></i>
     </button>
+
+    <!-- フォトビューアーモーダル -->
+    <div class="modal fade photo-viewer-modal" id="photoViewerModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="photoViewerTitle">フォトアルバム</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="photo-loading" id="photoLoading">
+              <div class="spinner-border text-light" role="status"></div>
+            </div>
+            <img id="photoViewerImage" src="" alt="Photo" style="display: none;">
+            <button class="photo-nav-btn prev" id="prevPhotoBtn" onclick="navigatePhoto(-1)" style="display: none;">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="photo-nav-btn next" id="nextPhotoBtn" onclick="navigatePhoto(1)" style="display: none;">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+            <div class="photo-counter" id="photoCounter" style="display: none;">1 / 1</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="modal fade" id="dataModal" tabindex="-1">
       <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -232,26 +342,6 @@
                 </div>
               </div>
 
-              <div class="mb-3 border p-3 rounded bg-light">
-                <label class="form-label fw-bold small text-muted"><i class="bi bi-image"></i> 表紙画像設定</label>
-                
-                <div class="input-group mb-2">
-                  <span class="input-group-text">URL</span>
-                  <input type="text" class="form-control" id="thumbUrl" placeholder="画像のURLを貼り付け">
-                  <button class="btn btn-outline-secondary" type="button" onclick="openLink('thumbUrl')">確認</button>
-                </div>
-
-                <div class="text-end">
-                     <a href="https://photos.google.com" target="_blank" class="btn btn-sm btn-outline-primary">
-                       <i class="bi bi-google"></i> Googleフォトを開く
-                     </a>
-                </div>
-                <div class="form-text small mt-2">
-                  ※写真は正方形の枠内に全体が収まるように表示されます。<br>
-                  ※Googleフォトの画像は、写真を拡大して<strong>「画像アドレスをコピー」</strong>したものを貼ってください。
-                </div>
-              </div>
-
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label class="form-label fw-bold small text-muted">アルバムURL</label>
@@ -259,6 +349,7 @@
                     <input type="text" class="form-control" id="albumUrl" placeholder="https://photos.app.goo.gl/...">
                     <button class="btn btn-outline-secondary" type="button" onclick="openLink('albumUrl')">開く</button>
                   </div>
+                  <div class="form-text small">※保存時に自動的に最初の画像を表紙に設定します</div>
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label fw-bold small text-muted">関連資料URL</label>
@@ -287,19 +378,30 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-      let currentDataList = [];
+      // SPA対応：既に存在する場合は再利用
+      if (typeof currentDataList === 'undefined') var currentDataList = [];
+      if (typeof currentPhotos === 'undefined') var currentPhotos = [];
+      if (typeof currentPhotoIndex === 'undefined') var currentPhotoIndex = 0;
 
-      window.onload = function() { loadData(); };
+      // ★SPA対応: 初期化関数をグローバルスコープに公開
+      function initEventsPage() {
+        loadData();
+      }
+
+      window.onload = function() { 
+        if (typeof initEventsPage === 'function') {
+          initEventsPage();
+        }
+      };
 
       function loadData() { 
         const container = document.getElementById('timelineContainer');
-        if(container.innerHTML.trim() === "") {
-             container.innerHTML = `
-              <div class="loading-container">
-                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
-                <span>読み込み中...</span>
-              </div>`;
-        }
+        // 常にローディング表示を挿入（再読み込み対応）
+        container.innerHTML = `
+          <div class="loading-container">
+            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+            <span>読み込み中...</span>
+          </div>`;
         google.script.run.withSuccessHandler(render).getEventData(); 
       }
      
@@ -328,8 +430,9 @@
                const idMatch = thumbUrl.match(/\/d\/(.+?)\//);
                if(idMatch) thumbUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w800`;
             }
-            // ▼ object-positionの指定を削除
-            imgHtml = `<img src="${thumbUrl}" alt="${d[1]}" onerror="this.onerror=null; this.parentNode.innerHTML='<div class=\\'no-image\\'><i class=\\'bi bi-exclamation-triangle\\'></i><span>Err</span></div>';">`;
+            // エラー時は"No Image"プレースホルダーを表示
+            imgHtml = `<img src="${thumbUrl}" alt="${d[1]}" onerror="this.onerror=null; this.style.display='none'; this.parentNode.querySelector('.no-image').style.display='flex';">
+                       <div class="no-image" style="display:none;"><i class="bi bi-image"></i><span>No Image</span></div>`;
           }
 
           let membersHtml = '';
@@ -348,13 +451,24 @@
           }
 
           // ▼ HTML構造を左右分割に変更
+          const albumUrl = d[4] || ''; // アルバムURL
+          const hasAlbum = albumUrl && albumUrl.startsWith('http');
+          const eventName = (d[1] || '').replace(/'/g, '&apos;'); // シングルクォートをエスケープ
+          
+          // 画像エリアにクリックイベントを追加（アルバムがある場合）
+          // data属性を使ってURLを安全に渡す
+          const imgClickEvent = hasAlbum 
+            ? `onclick="event.stopPropagation(); openPhotoViewerFromElement(this)" data-album-url="${albumUrl}" data-event-name="${eventName}"` 
+            : '';
+          
           const html = `
             <div class="timeline-item">
               <div class="timeline-dot"></div>
               <div class="card event-card" onclick="openEditModal(${item.rowNumber})">
                 
-                <div class="card-img-left-wrapper">
+                <div class="card-img-left-wrapper" ${imgClickEvent} title="${hasAlbum ? 'クリックして写真を表示' : ''}">
                   ${imgHtml}
+                  ${hasAlbum ? '<div class="position-absolute bottom-0 end-0 m-2"><span class="badge bg-dark bg-opacity-75"><i class="bi bi-images"></i></span></div>' : ''}
                   <div class="edit-overlay"><i class="bi bi-pencil-fill text-muted small"></i></div>
                 </div>
 
@@ -384,6 +498,148 @@
         }
       }
 
+      // 要素からアルバム情報を取得してフォトビューアーを開く
+      function openPhotoViewerFromElement(element) {
+        const albumUrl = element.getAttribute('data-album-url');
+        const eventName = element.getAttribute('data-event-name');
+        
+        if (albumUrl) {
+          openPhotoViewer(albumUrl, eventName);
+        }
+      }
+
+      // フォトビューアーを開く
+      function openPhotoViewer(albumUrl, eventName) {
+        // 前回のデータをクリア
+        currentPhotos = [];
+        currentPhotoIndex = 0;
+        
+        console.log('=== フォトビューアー起動 ===');
+        console.log('アルバムURL:', albumUrl);
+        console.log('イベント名:', eventName);
+        
+        document.getElementById('photoViewerTitle').innerText = eventName + ' - フォトアルバム';
+        document.getElementById('photoLoading').style.display = 'flex';
+        document.getElementById('photoLoading').innerHTML = '<div class="spinner-border text-light" role="status"></div><div class="text-light mt-2">写真を読み込んでいます...</div>';
+        document.getElementById('photoViewerImage').style.display = 'none';
+        document.getElementById('prevPhotoBtn').style.display = 'none';
+        document.getElementById('nextPhotoBtn').style.display = 'none';
+        document.getElementById('photoCounter').style.display = 'none';
+        
+        const modal = new bootstrap.Modal(document.getElementById('photoViewerModal'));
+        modal.show();
+        
+        // GASから写真リストを取得
+        google.script.run
+          .withSuccessHandler(function(photos) {
+            console.log('=== GASからの写真取得成功 ===');
+            console.log('取得枚数:', photos ? photos.length : 0);
+            
+            if (photos && photos.length > 0) {
+              console.log('写真URLリスト:');
+              photos.forEach((url, index) => {
+                console.log((index + 1) + ':', url);
+              });
+              
+              currentPhotos = photos;
+              currentPhotoIndex = 0;
+              showPhoto(0);
+            } else {
+              console.warn('写真が取得できませんでした（0件）');
+              // エラーではなく、わかりやすいメッセージを表示
+              document.getElementById('photoLoading').innerHTML = 
+                '<div class="text-light text-center"><i class="bi bi-images fs-1 mb-3 d-block"></i><div class="mb-2">写真が見つかりませんでした</div><small class="text-muted">アルバムが空か、アクセスできない可能性があります</small></div>';
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('=== GASからの写真取得失敗 ===');
+            console.error('エラー:', error);
+            document.getElementById('photoLoading').innerHTML = 
+              '<div class="text-light text-center"><i class="bi bi-exclamation-triangle fs-1 mb-3 d-block"></i><div class="mb-2">読み込みエラー</div><small>' + (error.message || 'サーバーエラーが発生しました') + '</small></div>';
+          })
+          .getAllPhotosFromAlbum(albumUrl);
+      }
+      
+      // 写真を表示
+      function showPhoto(index) {
+        if (!currentPhotos || currentPhotos.length === 0) {
+          console.warn('showPhoto: 表示する写真がありません');
+          return;
+        }
+        
+        currentPhotoIndex = index;
+        const img = document.getElementById('photoViewerImage');
+        const loading = document.getElementById('photoLoading');
+        
+        console.log('写真を表示:', (index + 1) + '/' + currentPhotos.length);
+        console.log('URL:', currentPhotos[index]);
+        
+        loading.style.display = 'flex';
+        loading.innerHTML = '<div class="spinner-border text-light" role="status"></div>';
+        img.style.display = 'none';
+        
+        // 画像読み込み完了時
+        img.onload = function() {
+          console.log('画像読み込み完了');
+          loading.style.display = 'none';
+          img.style.display = 'block';
+        };
+        
+        // 画像読み込みエラー時
+        img.onerror = function() {
+          console.error('画像読み込みエラー:', currentPhotos[index]);
+          loading.innerHTML = '<div class="text-light"><i class="bi bi-exclamation-triangle"></i><br>画像の読み込みに失敗しました</div>';
+          
+          // 次の画像があれば自動的にスキップ
+          if (currentPhotos.length > 1 && index < currentPhotos.length - 1) {
+            setTimeout(() => {
+              showPhoto(index + 1);
+            }, 1000);
+          }
+        };
+        
+        img.src = currentPhotos[index];
+        
+        // ナビゲーションボタンの表示/非表示
+        document.getElementById('prevPhotoBtn').style.display = (currentPhotos.length > 1) ? 'block' : 'none';
+        document.getElementById('nextPhotoBtn').style.display = (currentPhotos.length > 1) ? 'block' : 'none';
+        
+        // カウンター表示
+        const counter = document.getElementById('photoCounter');
+        counter.innerText = `${index + 1} / ${currentPhotos.length}`;
+        counter.style.display = 'block';
+      }
+      
+      // 写真をナビゲート
+      function navigatePhoto(direction) {
+        if (!currentPhotos || currentPhotos.length === 0) return;
+        
+        let newIndex = currentPhotoIndex + direction;
+        
+        // ループ処理
+        if (newIndex < 0) {
+          newIndex = currentPhotos.length - 1;
+        } else if (newIndex >= currentPhotos.length) {
+          newIndex = 0;
+        }
+        
+        showPhoto(newIndex);
+      }
+      
+      // キーボードナビゲーション
+      document.addEventListener('keydown', function(e) {
+        const modal = document.getElementById('photoViewerModal');
+        if (modal.classList.contains('show')) {
+          if (e.key === 'ArrowLeft') {
+            navigatePhoto(-1);
+          } else if (e.key === 'ArrowRight') {
+            navigatePhoto(1);
+          } else if (e.key === 'Escape') {
+            bootstrap.Modal.getInstance(modal).hide();
+          }
+        }
+      });
+
       function openRegisterModal() {
         document.getElementById('modalTitle').innerText = "イベント登録";
         document.getElementById('form').reset();
@@ -405,10 +661,9 @@
         document.getElementById('location').value = d[2];
         document.getElementById('count').value = d[3];
         document.getElementById('albumUrl').value = d[4]; 
-        document.getElementById('thumbUrl').value = d[5]; 
+        // thumbUrlは削除（表示不要）
         document.getElementById('docUrl').value = d[6];   
         document.getElementById('members').value = d[7];
-        // 画像位置の読み込みを削除
 
         document.getElementById('deleteBtn').style.display = 'block';
         new bootstrap.Modal(document.getElementById('dataModal')).show();
@@ -427,10 +682,9 @@
           location: document.getElementById('location').value,
           count: document.getElementById('count').value,
           albumUrl: document.getElementById('albumUrl').value,
-          thumbUrl: document.getElementById('thumbUrl').value,
+          thumbUrl: '', // 空文字を送信（GAS側で自動取得）
           docUrl: document.getElementById('docUrl').value,
           members: document.getElementById('members').value
-          // imgPos の送信を削除
         };
 
         google.script.run.withSuccessHandler(() => {

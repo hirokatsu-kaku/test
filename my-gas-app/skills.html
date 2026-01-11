@@ -17,15 +17,6 @@
   <style>
     body { background-color: #f4f6f9; font-family: "Helvetica Neue", Arial, sans-serif; padding-bottom: 60px; color: #333; }
 
-    /* ローディング */
-    #loading-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(255, 255, 255, 0.9); z-index: 9999;
-      display: flex; justify-content: center; align-items: center; flex-direction: column;
-      transition: opacity 0.3s; pointer-events: none; opacity: 0;
-    }
-    .loading-active { opacity: 1 !important; pointer-events: auto !important; }
-
     /* カード */
     .member-card {
       background: white; border: none; border-radius: 12px;
@@ -85,14 +76,9 @@
   </style>
 </head>
 <body>
-  <div id="loading-overlay">
-    <div class="spinner-border text-primary" role="status"></div>
-    <div class="mt-2 fw-bold text-muted">処理中...</div>
-  </div>
-
   <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h2 class="fw-bold m-0"><i class="bi bi-person-lines-fill text-primary"></i> Member & Skills</h2>
+      <h2 class="fw-bold m-0"><i class="bi bi-person-lines-fill text-primary"></i> メンバー</h2>
       <button class="btn btn-primary fw-bold shadow-sm" onclick="openRegisterModal()">
         <i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline">メンバー登録</span>
       </button>
@@ -193,35 +179,55 @@
     // ==========================================
     // 設定エリア
     // ==========================================
-    const ROLE_MASTER = ["CEO", "COO", "CSO", "インターン", "エンジニア", "サポート", "デザイナー", "マーケティング", "その他"];
+    // SPA対応：既に存在する場合は再利用
+    if (typeof ROLE_MASTER === 'undefined') {
+      var ROLE_MASTER = ["CEO", "COO", "CSO", "インターン", "エンジニア", "サポート", "デザイナー", "マーケティング", "その他"];
+    }
     
     // ★MBTIマスターデータ（名前と色カテゴリー）
-    const MBTI_MASTER = {
-      "INTJ": { name: "建築家", color: "purple" },
-      "INTP": { name: "論理学者", color: "purple" },
-      "ENTJ": { name: "指揮官", color: "purple" },
-      "ENTP": { name: "討論者", color: "purple" },
-      "ISTJ": { name: "管理者", color: "blue" },
-      "ISFJ": { name: "擁護者", color: "blue" },
-      "ESTJ": { name: "幹部", color: "blue" },
-      "ESFJ": { name: "領事官", color: "blue" },
-      "INFJ": { name: "提唱者", color: "green" },
-      "INFP": { name: "仲介者", color: "green" },
-      "ENFJ": { name: "主人公", color: "green" },
-      "ENFP": { name: "運動家", color: "green" },
-      "ISTP": { name: "巨匠", color: "yellow" },
-      "ISFP": { name: "冒険家", color: "yellow" },
-      "ESTP": { name: "起業家", color: "yellow" },
-      "ESFP": { name: "エンターテイナー", color: "yellow" }
+    if (typeof MBTI_MASTER === 'undefined') {
+      var MBTI_MASTER = {
+        "INTJ": { name: "建築家", color: "purple" },
+        "INTP": { name: "論理学者", color: "purple" },
+        "ENTJ": { name: "指揮官", color: "purple" },
+        "ENTP": { name: "討論者", color: "purple" },
+        "ISTJ": { name: "管理者", color: "blue" },
+        "ISFJ": { name: "擁護者", color: "blue" },
+        "ESTJ": { name: "幹部", color: "blue" },
+        "ESFJ": { name: "領事官", color: "blue" },
+        "INFJ": { name: "提唱者", color: "green" },
+        "INFP": { name: "仲介者", color: "green" },
+        "ENFJ": { name: "主人公", color: "green" },
+        "ENFP": { name: "運動家", color: "green" },
+        "ISTP": { name: "巨匠", color: "yellow" },
+        "ISFP": { name: "冒険家", color: "yellow" },
+        "ESTP": { name: "起業家", color: "yellow" },
+        "ESFP": { name: "エンターテイナー", color: "yellow" }
+      };
+    }
+    if (typeof MBTI_CODES === 'undefined') {
+      var MBTI_CODES = Object.keys(MBTI_MASTER);
+    }
+
+    // SPA対応：既に存在する場合は再利用
+    if (typeof globalData === 'undefined') var globalData = [];
+    if (typeof cropper === 'undefined') var cropper; 
+    if (typeof tagifySkills === 'undefined') var tagifySkills;
+    if (typeof tagifyStudying === 'undefined') var tagifyStudying;
+    if (typeof modalCrop === 'undefined') var modalCrop = null; // 後で初期化
+
+    // ★SPA対応: 初期化関数をグローバルスコープに公開
+    function initSkillsPage() {
+      initFormOptions();
+      loadData();
+    }
+
+    // 通常のロード時にも対応
+    window.onload = function() { 
+      if (typeof initSkillsPage === 'function') {
+        initSkillsPage();
+      }
     };
-    const MBTI_CODES = Object.keys(MBTI_MASTER);
-
-    let globalData = [];
-    let cropper; 
-    let tagifySkills, tagifyStudying;
-    const modalCrop = new bootstrap.Modal(document.getElementById('cropModal'));
-
-    window.onload = function() { initFormOptions(); loadData(); };
 
     function initFormOptions() {
       const deptSelect = document.getElementById('dept');
@@ -240,13 +246,19 @@
       tagifyStudying = new Tagify(inputStudying, { originalInputValueFormat: valuesArr => valuesArr.map(item => item.value).join(',') });
     }
 
-    function showLoading() { document.getElementById('loading-overlay').classList.add('loading-active'); }
-    function hideLoading() { document.getElementById('loading-overlay').classList.remove('loading-active'); }
-    function loadData() { showLoading(); google.script.run.withSuccessHandler(renderCards).withFailureHandler(onFailure).getSkillData(); }
+    function loadData() { 
+      // ローディング表示を挿入
+      const container = document.getElementById('cardContainer');
+      container.innerHTML = `
+        <div class="col-12 text-center py-5">
+          <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+          <div class="fw-bold text-muted">読み込み中...</div>
+        </div>`;
+      google.script.run.withSuccessHandler(renderCards).withFailureHandler(onFailure).getSkillData(); 
+    }
 
     // ★ 表示処理
     function renderCards(data) {
-      hideLoading();
       globalData = data;
       const container = document.getElementById('cardContainer');
       const tagCloud = document.getElementById('tagCloud');
@@ -352,7 +364,7 @@
       const btn = event.target.closest('.dropdown').querySelector('.status-btn');
       btn.innerText = newStatus; btn.className = 'status-btn btn dropdown-toggle';
       if(newStatus === '募集中') btn.classList.add('bg-open'); else if(newStatus === '忙しい') btn.classList.add('bg-busy'); else btn.classList.add('bg-trip');
-      showLoading(); google.script.run.withSuccessHandler(() => { loadData(); }).withFailureHandler(onFailure).updateSkillStatus(rowNumber, newStatus);
+      google.script.run.withSuccessHandler(() => { loadData(); }).withFailureHandler(onFailure).updateSkillStatus(rowNumber, newStatus);
     }
     function openRegisterModal() {
       document.getElementById('modalTitle').innerText = "メンバー登録"; document.getElementById('form').reset();
@@ -374,26 +386,50 @@
       new bootstrap.Modal(document.getElementById('dataModal')).show();
     }
     function handleImageSelect(input) {
-      if (input.files && input.files[0]) { const reader = new FileReader(); reader.onload = function (e) { document.getElementById('cropImage').src = e.target.result; modalCrop.show(); const image = document.getElementById('cropImage'); if(cropper) cropper.destroy(); setTimeout(() => { cropper = new Cropper(image, { aspectRatio: 1, viewMode: 1, autoCropArea: 1 }); }, 200); }; reader.readAsDataURL(input.files[0]); } input.value = '';
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          document.getElementById('cropImage').src = e.target.result;
+          
+          // modalCropを初期化（存在しない、または既存のものを再利用）
+          if (!modalCrop) {
+            modalCrop = new bootstrap.Modal(document.getElementById('cropModal'));
+          }
+          modalCrop.show();
+          
+          const image = document.getElementById('cropImage');
+          if (cropper) cropper.destroy();
+          setTimeout(() => {
+            cropper = new Cropper(image, { aspectRatio: 1, viewMode: 1, autoCropArea: 1 });
+          }, 200);
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+      input.value = '';
     }
+    
     function cropAndSet() {
-      if (!cropper) return; const canvas = cropper.getCroppedCanvas({ width: 150, height: 150 }); const base64 = canvas.toDataURL('image/jpeg', 0.7);
-      document.getElementById('previewImg').src = base64; document.getElementById('photoUrl').value = base64; modalCrop.hide();
+      if (!cropper) return;
+      const canvas = cropper.getCroppedCanvas({ width: 150, height: 150 });
+      const base64 = canvas.toDataURL('image/jpeg', 0.7);
+      document.getElementById('previewImg').src = base64;
+      document.getElementById('photoUrl').value = base64;
+      if (modalCrop) modalCrop.hide();
     }
     function saveData() {
-      const name = document.getElementById('name').value; if (!name) { alert("氏名は必須です"); return; } showLoading();
+      const name = document.getElementById('name').value; if (!name) { alert("氏名は必須です"); return; }
       const data = { rowNumber: document.getElementById('rowNumber').value, name: name, dept: document.getElementById('dept').value, skills: document.getElementById('skills').value, studying: document.getElementById('studying').value, status: document.getElementById('status').value, slackId: document.getElementById('slackId').value, photoUrl: document.getElementById('photoUrl').value, comment: document.getElementById('comment').value, mbti: document.getElementById('mbti').value };
       google.script.run.withFailureHandler(onFailure).withSuccessHandler(() => { bootstrap.Modal.getInstance(document.getElementById('dataModal')).hide(); loadData(); }).saveSkill(data);
     }
     function deleteData() {
-      const row = document.getElementById('rowNumber').value; if (!row) return; if (confirm("削除しますか？")) { showLoading(); google.script.run.withSuccessHandler(() => { bootstrap.Modal.getInstance(document.getElementById('dataModal')).hide(); loadData(); }).deleteSkill(row); }
+      const row = document.getElementById('rowNumber').value; if (!row) return; if (confirm("削除しますか？")) { google.script.run.withSuccessHandler(() => { bootstrap.Modal.getInstance(document.getElementById('dataModal')).hide(); loadData(); }).deleteSkill(row); }
     }
     function filterCards() {
       const val = document.getElementById('searchInput').value.toLowerCase(); const cards = document.getElementsByClassName('card-item');
       Array.from(cards).forEach(card => { const text = card.getAttribute('data-search').toLowerCase(); card.style.display = text.includes(val) ? "block" : "none"; });
     }
     function setSearch(tag) { document.getElementById('searchInput').value = tag; filterCards(); }
-    function onFailure(e) { hideLoading(); alert("エラー: " + e.message); }
+    function onFailure(e) { alert("エラー: " + e.message); }
   </script>
 </body>
 </html>

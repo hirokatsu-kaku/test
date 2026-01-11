@@ -49,7 +49,7 @@
   </head>
   <body>
 
-    <h2 class="text-center fw-bold mb-4">PC機材貸し出し管理</h2>
+    <h2 class="text-center fw-bold mb-4">PC機材貸出管理</h2>
 
     <div class="table-responsive">
       <table class="table custom-table">
@@ -114,11 +114,19 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-      let isEditMode = false; // 現在が「編集モード」かどうかのフラグ
+      // SPA対応：既に存在する場合は再利用
+      if (typeof isEditMode === 'undefined') var isEditMode = false;
+
+      // ★SPA対応: 初期化関数をグローバルスコープに公開
+      function initPcPage() {
+        loadPcData();
+      }
 
       // 画面読み込み時にデータを取得開始
       window.onload = function() {
-        loadPcData();
+        if (typeof initPcPage === 'function') {
+          initPcPage();
+        }
       };
 
       // =======================================================
@@ -135,20 +143,31 @@
         const tableBody = document.getElementById('pcTableBody');
         tableBody.innerHTML = "";
         
+        // デバッグ用：データ構造をコンソールに出力
+        console.log('PC管理データ:', data);
+        
         if (!data || data.length === 0) {
           tableBody.innerHTML = "<tr><td colspan='5' class='text-center py-4 text-muted'>データがありません</td></tr>";
           return;
         }
 
         data.forEach(function(item) {
+          // データは item.data 配列に格納されている
+          // data[0]:機材名, data[1]:所持者, data[2]:貸出日, data[3]:備考
+          const d = item.data;
+          const name = d[0] || '';
+          const holder = d[1] || '';
+          const date = d[2] || '';
+          const note = d[3] || '';
+          
           const html = `
             <tr>
-              <td>${item.name}</td>
-              <td>${item.holder}</td>
-              <td>${item.date ? item.date.replace(/-/g, '/') : '-'}</td>
-              <td class="text-muted small">${item.note}</td>
+              <td>${name}</td>
+              <td>${holder}</td>
+              <td>${date ? date.replace(/-/g, '/') : '-'}</td>
+              <td class="text-muted small">${note}</td>
               <td>
-                <button class="btn btn-edit" onclick="openEditModal(${item.rowNumber}, '${item.name}', '${item.holder}', '${item.date}', '${item.note}')">編集</button>
+                <button class="btn btn-edit" onclick="openEditModal(${item.rowNumber}, '${name}', '${holder}', '${date}', '${note}')">編集</button>
                 <button class="btn btn-delete" onclick="deleteData(${item.rowNumber})">削除</button>
               </td>
             </tr>`;

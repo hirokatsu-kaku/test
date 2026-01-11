@@ -150,14 +150,24 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-      let currentEditRow = null;
+      // SPA対応：既に存在する場合は再利用
+      if (typeof currentEditRow === 'undefined') var currentEditRow = null;
 
-      window.onload = function() { loadData(); };
+      // ★SPA対応: 初期化関数をグローバルスコープに公開
+      function initIncidentPage() {
+        loadData();
+      }
+
+      window.onload = function() { 
+        if (typeof initIncidentPage === 'function') {
+          initIncidentPage();
+        }
+      };
 
       
       // ▼▼▼ 修正後 ▼▼▼
       function loadData() {
-        const loadingHtml = '<div class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm"></span> Loading...</div>';
+        const loadingHtml = '<div class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm"></span> 読み込み中...</div>';
         // 3つのカラム全てにローディングを表示
         document.getElementById('list-todo').innerHTML = loadingHtml;
         document.getElementById('list-doing').innerHTML = loadingHtml;

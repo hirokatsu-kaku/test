@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+  
+  <!-- Skills.htmlで使用するライブラリ -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      background-color: #f8f9fa;
+    }
+
+    /* サイドバー */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 260px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      transition: transform 0.3s ease, width 0.3s ease;
+    }
+
+    .sidebar.collapsed {
+      width: 70px;
+    }
+
+    .sidebar.collapsed .sidebar-header h4,
+    .sidebar.collapsed .sidebar-header p,
+    .sidebar.collapsed .nav-link-custom span {
+      display: none;
+    }
+
+    .sidebar.collapsed .nav-link-custom {
+      justify-content: center;
+      padding: 15px 0;
+    }
+
+    .sidebar.collapsed .nav-link-custom i {
+      margin-right: 0;
+    }
+
+    .sidebar-header {
+      padding: 25px 20px;
+      background: rgba(0,0,0,0.1);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      position: relative;
+    }
+
+    /* ボタンを確実にはみ出させるための設定 */
+    .sidebar,
+    .sidebar-header {
+      overflow: visible !important;
+    }
+    
+    /* サイドバー内のスクロール可能エリアを別途作成 */
+    .nav-menu {
+      overflow-y: auto;
+      max-height: calc(100vh - 110px); /* ヘッダー分を引く */
+    }
+
+    .sidebar-toggle-btn {
+      position: absolute;
+      top: 50%;
+      right: -18px;
+      transform: translateY(-50%);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: 3px solid white;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s ease;
+      z-index: 1001;
+      font-size: 1.1rem;
+    }
+
+    .sidebar-toggle-btn:hover {
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      transform: translateY(-50%) scale(1.15);
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6);
+    }
+
+    .sidebar-toggle-btn:active {
+      transform: translateY(-50%) scale(1.05);
+    }
+
+    .sidebar.collapsed .sidebar-toggle-btn {
+      right: -18px;
+    }
+
+    .sidebar-header h4 {
+      margin: 0;
+      font-weight: bold;
+      font-size: 1.3rem;
+    }
+
+    .sidebar-header p {
+      margin: 5px 0 0 0;
+      font-size: 0.8rem;
+      opacity: 0.8;
+    }
+
+    .nav-menu {
+      list-style: none;
+      padding: 10px 0;
+      margin: 0;
+    }
+
+    .nav-item {
+      margin: 0;
+    }
+
+    .nav-link-custom {
+      display: flex;
+      align-items: center;
+      padding: 15px 20px;
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      transition: all 0.3s;
+      border-left: 4px solid transparent;
+      cursor: pointer;
+    }
+
+    .nav-link-custom:hover {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border-left-color: white;
+    }
+
+    .nav-link-custom.active {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border-left-color: white;
+      font-weight: bold;
+    }
+
+    .nav-link-custom i {
+      font-size: 1.2rem;
+      margin-right: 12px;
+      width: 24px;
+      text-align: center;
+    }
+
+    /* メインコンテンツエリア */
+    .main-content {
+      margin-left: 260px;
+      min-height: 100vh;
+      transition: margin-left 0.3s ease;
+    }
+
+    .main-content.expanded {
+      margin-left: 70px;
+    }
+
+    /* トップバー - モバイルメニュートグルのみ */
+    .topbar {
+      display: none; /* デフォルトは非表示 */
+      background: white;
+      padding: 15px 30px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      position: sticky;
+      top: 0;
+      z-index: 999;
+    }
+
+    .menu-toggle {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: #333;
+      cursor: pointer;
+    }
+
+    /* コンテンツエリア */
+    #contentArea {
+      padding: 0;
+      min-height: calc(100vh - 70px);
+    }
+
+    /* ダッシュボード専用スタイル */
+    .dashboard-container {
+      padding: 40px;
+    }
+
+    .dashboard-header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+
+    .dashboard-header h1 {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .dashboard-header p {
+      color: #6c757d;
+      font-size: 1.1rem;
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 25px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .menu-card {
+      background: white;
+      border-radius: 15px;
+      padding: 35px 25px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      transition: all 0.3s;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+
+    .menu-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+      border-color: #667eea;
+    }
+
+    .menu-card-icon {
+      font-size: 3.5rem;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .menu-card h5 {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 1.3rem;
+    }
+
+    .menu-card p {
+      color: #6c757d;
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    /* レスポンシブ */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-260px);
+      }
+
+      .sidebar.show {
+        transform: translateX(0);
+      }
+
+      .sidebar.collapsed {
+        width: 260px;
+      }
+
+      .main-content {
+        margin-left: 0;
+      }
+
+      .main-content.expanded {
+        margin-left: 0;
+      }
+
+      .topbar {
+        display: flex; /* モバイル時のみ表示 */
+        justify-content: flex-start;
+        align-items: center;
+      }
+
+      .dashboard-container {
+        padding: 20px;
+      }
+
+      .menu-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar-toggle-btn {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ローディングオーバーレイは削除 -->
+
+  <!-- サイドバー -->
+  <div class="sidebar collapsed" id="sidebar">
+    <div class="sidebar-header">
+      <h4><i class="bi bi-grid-3x3-gap-fill me-2"></i>社内ポータル</h4>
+      <p>Company Portal</p>
+      <button class="sidebar-toggle-btn" onclick="toggleSidebarCollapse()" title="サイドバーを開く">
+        <i class="bi bi-chevron-right" id="toggleIcon"></i>
+      </button>
+    </div>
+    <ul class="nav-menu">
+      <li class="nav-item">
+        <a class="nav-link-custom active" onclick="loadPage('dashboard')">
+          <i class="bi bi-house-door-fill"></i>
+          <span>ダッシュボード</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link-custom" onclick="loadPage('pc')">
+          <i class="bi bi-laptop"></i>
+          <span>PC機材管理</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link-custom" onclick="loadPage('skills')">
+          <i class="bi bi-person-lines-fill"></i>
+          <span>メンバー一覧</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link-custom" onclick="loadPage('books')">
+          <i class="bi bi-journal-bookmark-fill"></i>
+          <span>図書管理</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link-custom" onclick="loadPage('incident')">
+          <i class="bi bi-tools"></i>
+          <span>ヒヤリハット</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link-custom" onclick="loadPage('events')">
+          <i class="bi bi-clock-history"></i>
+          <span>イベント履歴</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+
+  <!-- メインコンテンツ -->
+  <div class="main-content expanded">
+    <!-- トップバー -->
+    <div class="topbar">
+      <button class="menu-toggle" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+      </button>
+    </div>
+
+    <!-- コンテンツ表示エリア -->
+    <div id="contentArea">
+      <!-- ダッシュボード（デフォルト表示） -->
+      <div class="dashboard-container">
+        <div class="dashboard-header">
+          <h1></i> ようこそ</h1>
+          <p>各機能へアクセスするには、下のメニューまたは左のサイドバーをご利用ください</p>
+        </div>
+        
+        <div class="menu-grid">
+          <div class="menu-card" onclick="loadPage('pc')">
+            <div class="menu-card-icon">
+              <i class="bi bi-laptop"></i>
+            </div>
+            <h5>PC機材管理</h5>
+            <p>機材の貸し出し状況を管理</p>
+          </div>
+
+          <div class="menu-card" onclick="loadPage('skills')">
+            <div class="menu-card-icon">
+              <i class="bi bi-person-lines-fill"></i>
+            </div>
+            <h5>メンバー一覧</h5>
+            <p>社員のスキルとプロフィール</p>
+          </div>
+
+          <div class="menu-card" onclick="loadPage('books')">
+            <div class="menu-card-icon">
+              <i class="bi bi-journal-bookmark-fill"></i>
+            </div>
+            <h5>図書管理</h5>
+            <p>社内書籍の貸出と管理</p>
+          </div>
+
+          <div class="menu-card" onclick="loadPage('incident')">
+            <div class="menu-card-icon">
+              <i class="bi bi-tools"></i>
+            </div>
+            <h5>ヒヤリハット</h5>
+            <p>クレームと改善提案の管理</p>
+          </div>
+
+          <div class="menu-card" onclick="loadPage('events')">
+            <div class="menu-card-icon">
+              <i class="bi bi-clock-history"></i>
+            </div>
+            <h5>イベント履歴</h5>
+            <p>会社イベントの記録</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Skills.htmlで使用するライブラリ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+  
+  <script>
+    // 現在のページを記憶
+    let currentPage = 'dashboard';
+
+    /**
+     * HTMLを挿入し、含まれるスクリプトを強制実行するヘルパー関数
+     * innerHTML では <script> タグが実行されないため、手動で実行する
+     */
+    function setInnerHTML(element, htmlContent) {
+      // まずHTMLを挿入
+      element.innerHTML = htmlContent;
+      
+      // 挿入されたHTML内の全ての <script> タグを取得
+      const scripts = element.querySelectorAll('script');
+      
+      // 各スクリプトを新しい要素として再作成・実行
+      scripts.forEach(oldScript => {
+        const newScript = document.createElement('script');
+        
+        // スクリプトの属性をコピー（src, type など）
+        Array.from(oldScript.attributes).forEach(attr => {
+          newScript.setAttribute(attr.name, attr.value);
+        });
+        
+        // インラインスクリプトの場合は内容をコピー
+        if (oldScript.textContent) {
+          newScript.textContent = oldScript.textContent;
+        }
+        
+        // 古いスクリプトを新しいスクリプトに置き換え
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
+    }
+
+    // ページ切り替え関数
+    function loadPage(pageName) {
+      if (currentPage === pageName) return;
+
+      // ナビゲーションのアクティブ状態を更新
+      updateNavigation(pageName);
+
+      // ダッシュボードの場合は専用HTMLを表示
+      if (pageName === 'dashboard') {
+        showDashboard();
+        currentPage = pageName;
+        return;
+      }
+
+      // 対応するHTMLファイル名を決定
+      const fileMap = {
+        'pc': 'index',
+        'skills': 'skills',
+        'books': 'books',
+        'incident': 'incident',
+        'events': 'events'
+      };
+      const fileName = fileMap[pageName];
+
+      // GASからコンテンツを取得して表示
+      google.script.run
+        .withSuccessHandler(function(content) {
+          console.log('ページコンテンツ取得成功:', pageName);
+          const contentArea = document.getElementById('contentArea');
+          
+          // ★重要: setInnerHTML を使ってスクリプトを強制実行
+          setInnerHTML(contentArea, content);
+          
+          // スクリプト実行後、少し待ってから初期化関数を呼び出す
+          setTimeout(function() {
+            try {
+              console.log('初期化関数を呼び出し中:', pageName);
+              // 各ページの初期化関数を呼び出し
+              if (pageName === 'pc' && typeof initPcPage === 'function') {
+                console.log('initPcPage() 実行');
+                initPcPage();
+              } else if (pageName === 'skills' && typeof initSkillsPage === 'function') {
+                console.log('initSkillsPage() 実行');
+                initSkillsPage();
+              } else if (pageName === 'books' && typeof initBooksPage === 'function') {
+                console.log('initBooksPage() 実行');
+                initBooksPage();
+              } else if (pageName === 'incident' && typeof initIncidentPage === 'function') {
+                console.log('initIncidentPage() 実行');
+                initIncidentPage();
+              } else if (pageName === 'events' && typeof initEventsPage === 'function') {
+                console.log('initEventsPage() 実行');
+                initEventsPage();
+              } else {
+                console.warn('初期化関数が見つかりません:', pageName);
+                // 再度確認（スクリプトの読み込みが遅れている場合）
+                setTimeout(function() {
+                  if (pageName === 'books' && typeof initBooksPage === 'function') {
+                    console.log('遅延実行: initBooksPage()');
+                    initBooksPage();
+                  } else if (pageName === 'events' && typeof initEventsPage === 'function') {
+                    console.log('遅延実行: initEventsPage()');
+                    initEventsPage();
+                  } else if (pageName === 'pc' && typeof initPcPage === 'function') {
+                    console.log('遅延実行: initPcPage()');
+                    initPcPage();
+                  } else if (pageName === 'skills' && typeof initSkillsPage === 'function') {
+                    console.log('遅延実行: initSkillsPage()');
+                    initSkillsPage();
+                  } else if (pageName === 'incident' && typeof initIncidentPage === 'function') {
+                    console.log('遅延実行: initIncidentPage()');
+                    initIncidentPage();
+                  }
+                }, 200);
+              }
+            } catch (e) {
+              console.error('ページ初期化エラー:', e);
+            }
+            
+            currentPage = pageName;
+            
+            // モバイルの場合はサイドバーを閉じる
+            if (window.innerWidth <= 768) {
+              document.getElementById('sidebar').classList.remove('show');
+            }
+          }, 300); // スクリプトの実行完了を待つため少し長めに（150ms→300ms）
+        })
+        .withFailureHandler(function(error) {
+          console.error('ページコンテンツ取得失敗:', error);
+          document.getElementById('contentArea').innerHTML = 
+            '<div class="alert alert-danger m-4">エラーが発生しました: ' + error.message + '</div>';
+        })
+        .getPageContent(fileName);
+    }
+
+    // ダッシュボード表示
+    function showDashboard() {
+      document.getElementById('contentArea').innerHTML = `
+        <div class="dashboard-container">
+          <div class="dashboard-header">
+            <h1></i> ようこそ</h1>
+            <p>各機能へアクセスするには、下のメニューまたは左のサイドバーをご利用ください</p>
+          </div>
+          
+          <div class="menu-grid">
+            <div class="menu-card" onclick="loadPage('pc')">
+              <div class="menu-card-icon">
+                <i class="bi bi-laptop"></i>
+              </div>
+              <h5>PC機材管理</h5>
+              <p>機材の貸し出し状況を管理</p>
+            </div>
+
+            <div class="menu-card" onclick="loadPage('skills')">
+              <div class="menu-card-icon">
+                <i class="bi bi-person-lines-fill"></i>
+              </div>
+              <h5>メンバー一覧</h5>
+              <p>社員のスキルとプロフィール</p>
+            </div>
+
+            <div class="menu-card" onclick="loadPage('books')">
+              <div class="menu-card-icon">
+                <i class="bi bi-journal-bookmark-fill"></i>
+              </div>
+              <h5>図書管理</h5>
+              <p>社内書籍の貸出と管理</p>
+            </div>
+
+            <div class="menu-card" onclick="loadPage('incident')">
+              <div class="menu-card-icon">
+                <i class="bi bi-tools"></i>
+              </div>
+              <h5>ヒヤリハット</h5>
+              <p>クレームと改善提案の管理</p>
+            </div>
+
+            <div class="menu-card" onclick="loadPage('events')">
+              <div class="menu-card-icon">
+                <i class="bi bi-clock-history"></i>
+              </div>
+              <h5>イベント履歴</h5>
+              <p>会社イベントの記録</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ナビゲーションのアクティブ状態を更新
+    function updateNavigation(pageName) {
+      document.querySelectorAll('.nav-link-custom').forEach(link => {
+        link.classList.remove('active');
+      });
+      
+      const linkMap = {
+        'dashboard': 0,
+        'pc': 1,
+        'skills': 2,
+        'books': 3,
+        'incident': 4,
+        'events': 5
+      };
+      
+      const index = linkMap[pageName];
+      if (index !== undefined) {
+        document.querySelectorAll('.nav-link-custom')[index].classList.add('active');
+      }
+    }
+
+    // サイドバートグル（モバイル用）
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('show');
+    }
+
+    // サイドバー折りたたみトグル（デスクトップ用）
+    function toggleSidebarCollapse() {
+      const sidebar = document.getElementById('sidebar');
+      const mainContent = document.querySelector('.main-content');
+      const toggleIcon = document.getElementById('toggleIcon');
+      
+      sidebar.classList.toggle('collapsed');
+      mainContent.classList.toggle('expanded');
+      
+      // アイコンの向きを変更
+      if (sidebar.classList.contains('collapsed')) {
+        toggleIcon.className = 'bi bi-chevron-right';
+      } else {
+        toggleIcon.className = 'bi bi-chevron-left';
+      }
+    }
+
+    // 初期化
+    window.addEventListener('load', function() {
+      currentPage = 'dashboard';
+    });
+  </script>
+</body>
+</html>
