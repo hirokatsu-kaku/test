@@ -2,7 +2,7 @@
 
 これは実際に業務で制作した社内ポータルを、デモ用に一部抜粋、改変したものです。<br>
 
-**制作者:霍洋克**
+**制作者：霍洋克**
 
 **制作物：[こちら](https://script.google.com/macros/s/AKfycbzS-t9uvsilsTT3ADbBnqwjEBiFjAzZPCitSIM8NaHZ8E7LLCOeidMAA_BQEPkEustb/exec)**
 
